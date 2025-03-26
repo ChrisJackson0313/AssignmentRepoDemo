@@ -13,6 +13,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @Setter
@@ -44,7 +46,7 @@ public class UserModel {
     @NotBlank
     @NotBlank(message = "Email cannot be blank")
     @Email(message = "Email must be valid")
-    @Column(name="useremail", unique=true)
+    @Column(name="email", unique=true)
     private String email;
 
     @Size(min = 6, message = "Password must be at least 6 characters")
@@ -53,5 +55,6 @@ public class UserModel {
     @NotBlank(message = "Password cannot be blank")
     @Column(name="userpassword")
     private String password;
+
 
 }

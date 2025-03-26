@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>User Login</title>
+  <style>
+    .error { color: red; }
+    .error-border { border: 1px solid red; }
+    .auth-error {
+      color: #721c24;
+      background-color: #f8d7da;
+      border: 1px solid #f5c6cb;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+<h1>Login</h1>
+
+<!-- Authentication Error Message -->
+<div th:if="${authError}" class="auth-error">
+  <span th:text="${authError}"></span>
+</div>
+
+<!-- Login Form -->
+<form th:action="@{/auth/login}" method="post" th:object="${userDTO}">
+  <!-- Email Field -->
+  <div>
+    <label>Email:</label>
+    <input type="email" th:field="*{email}"
+           th:class="${#fields.hasErrors('email')} ? 'error-border' : ''" required/>
+    <span th:if="${#fields.hasErrors('email')}"
+          th:errors="*{email}" class="error"></span>
+  </div>
+
+  <!-- Password Field -->
+  <div>
+    <label>Password:</label>
+    <input type="password" th:field="*{password}"
+           th:class="${#fields.hasErrors('password')} ? 'error-border' : ''" required/>
+    <span th:if="${#fields.hasErrors('password')}"
+          th:errors="*{password}" class="error"></span>
+  </div>
+
+  <button type="submit">Login</button>
+</form>
+
+<p>Don't have an account? <a th:href="@{/auth/register}">Register here</a></p>
+</body>
+</html>

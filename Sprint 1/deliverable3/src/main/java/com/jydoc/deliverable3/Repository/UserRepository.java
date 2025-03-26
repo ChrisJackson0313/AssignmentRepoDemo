@@ -6,6 +6,7 @@ import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface UserRepository extends CrudRepository<UserModel, Long> {
@@ -14,10 +15,12 @@ public interface UserRepository extends CrudRepository<UserModel, Long> {
 
     //Custom Queries
     List<UserModel> findById(int id);  //TODO: Switch this to Long type
-    List<UserModel> findByEmail(String email);
+    Optional<UserModel> findByEmail(String email);
     List<UserModel> findByFirstName(String firstName);
     List<UserModel> findByLastName(String lastName);
     List<UserModel> findByFirstNameAndLastName(String firstName, String lastName);
+    List<UserModel> findAllByEmail(String email);
+
 
 
 

@@ -1,10 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Login Successful</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #c3e6cb;
+        }
+        .user-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 5px;
+        }
+        .btn:hover {
+            background-color: #0069d9;
+        }
+    </style>
 </head>
 <body>
-Login Success
+<div class="success-message">
+    <h2>🎉 Login Successful!</h2>
+    <p>You have successfully logged into your account.</p>
+</div>
+
+<div class="user-info" th:if="${session.user}">
+    <h3>Welcome, <span th:text="${session.user.firstName} + ' ' + ${session.user.lastName}"></span>!</h3>
+    <p><strong>Email:</strong> <span th:text="${session.user.email}"></span></p>
+    <p><small>Last login: <span th:text="${#temporals.format(session.user.lastLogin, 'MMM dd, yyyy hh:mm a')}"></span></small></p>
+</div>
+
+<div>
+    <a href="/" class="btn">Go to Dashboard</a>
+    <a href="/profile" class="btn">View Profile</a>
+</div>
+
+<div style="margin-top: 30px; font-size: 0.9em;">
+    <p>Not you? <a th:href="@{/logout}">Sign out</a></p>
+</div>
 </body>
 </html>
