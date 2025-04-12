@@ -107,6 +107,11 @@
       margin-bottom: 1rem;
     }
 
+    .qr-code-container {
+      max-width: 300px;
+      margin: 0 auto;
+    }
+
     @media (max-width: 768px) {
       .sidebar {
         min-height: auto;
@@ -194,9 +199,14 @@
           <i class="fas fa-pills me-2"></i>My Medications
         </h1>
         <div class="btn-toolbar mb-2 mb-md-0">
-          <a th:href="@{/user/medication/add}" class="btn btn-primary">
-            <i class="fas fa-plus-circle me-1"></i> Add Medication
-          </a>
+          <div class="btn-group me-2">
+            <a th:href="@{/user/medication/add}" class="btn btn-primary">
+              <i class="fas fa-plus-circle me-1"></i> Add Medication
+            </a>
+            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#calendarQRModal">
+              <i class="fas fa-qrcode me-1"></i> Get Calendar QR
+            </button>
+          </div>
         </div>
       </div>
 
@@ -300,6 +310,45 @@
                   </button>
                 </form>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calendar QR Modal -->
+      <div class="modal fade" id="calendarQRModal" tabindex="-1" aria-labelledby="calendarQRModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="calendarQRModalLabel">
+                <i class="fas fa-calendar-plus me-2"></i>Add to iOS Calendar
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+              <div class="alert alert-info mb-3">
+                <i class="fas fa-info-circle me-2"></i>
+                Scan this QR code with your iPhone to add your medication schedule to your calendar.
+              </div>
+
+              <div class="qr-code-container">
+                <img th:src="@{/user/medication/calendar-qr}" alt="Calendar QR Code" class="img-fluid mb-3">
+              </div>
+
+              <div class="instructions mt-3">
+                <h6 class="text-muted">How to use:</h6>
+                <ol class="text-start small">
+                  <li>Open your iPhone camera</li>
+                  <li>Point it at the QR code</li>
+                  <li>Tap the notification that appears</li>
+                  <li>Confirm to add all events to your calendar</li>
+                </ol>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                <i class="fas fa-times me-1"></i> Close
+              </button>
             </div>
           </div>
         </div>

@@ -4,9 +4,12 @@ import com.jydoc.deliverable4.dtos.userdtos.DashboardDTO;
 import com.jydoc.deliverable4.dtos.MedicationDTO;
 import com.jydoc.deliverable4.dtos.userdtos.UserDTO;
 import com.jydoc.deliverable4.security.Exceptions.PasswordMismatchException;
+import com.jydoc.deliverable4.services.recordservices.CalendarService;
+import com.jydoc.deliverable4.services.recordservices.QRCodeService;
 import com.jydoc.deliverable4.services.userservices.DashboardService;
 import com.jydoc.deliverable4.services.medicationservices.MedicationService;
 import com.jydoc.deliverable4.services.userservices.UserService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +45,8 @@ public class UserController {
     private final DashboardService dashboardService;
     private final MedicationService medicationService;
     private final UserService userService;
+    private final QRCodeService qrCodeService;
+    private final CalendarService calendarService;
 
     /**
      * Constructs a new UserController with required services.
@@ -52,10 +57,14 @@ public class UserController {
      */
     public UserController(DashboardService dashboardService,
                           MedicationService medicationService,
-                          UserService userService) {
+                          UserService userService,
+                          CalendarService calendarService,
+                          QRCodeService qrCodeService) {
         this.dashboardService = dashboardService;
         this.medicationService = medicationService;
         this.userService = userService;
+        this.calendarService = calendarService;
+        this.qrCodeService = qrCodeService;
         logger.info("UserController initialized with all required services");
     }
 
@@ -117,6 +126,27 @@ public class UserController {
             return "user/profile";
         }
     }
+
+    @GetMapping("/medication/calendar-qr")
+    public void generateCalendarQR(
+            @AuthenticationPrincipal UserDetails userDetails,
+            HttpServletResponse response) throws Exception {
+
+        // Get user's medications
+        List<MedicationDTO> medications = medicationService.getUserMedications(userDetails.getUsername());
+
+        // Generate iCal data
+        String calendarData = calendarService.generateICalData(medications);
+
+        // Generate QR code
+        byte[] qrCode = qrCodeService.generateQRCodeImage(calendarData, 300, 300);
+
+        // Set response
+        response.setContentType("image/png");
+        response.getOutputStream().write(qrCode);
+        response.getOutputStream().flush();
+    }
+
 
     /**
      * Handles profile updates for the authenticated user.
