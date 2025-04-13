@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -23,7 +24,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import javax.validation.Valid;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -545,36 +549,42 @@ public class UserController {
     }
 
     /**
-     * Displays upcoming medication refills.
+     * Displays health metrics information with medication intake logging and stats.
      *
      * @param userDetails Authenticated user details
      * @param model Spring MVC model for view data
-     * @return The refills view template
-     */
-    @GetMapping("/refills")
-    public String showRefills(@AuthenticationPrincipal UserDetails userDetails, Model model) {
-        logger.debug("Loading upcoming refills for user: {}", userDetails.getUsername());
-        try {
-            model.addAttribute("refills",
-                    medicationService.getUpcomingRefills(userDetails.getUsername()));
-            return "user/refills";
-        } catch (Exception e) {
-            logger.error("Failed to load refills for user {}: {}",
-                    userDetails.getUsername(), e.getMessage(), e);
-            model.addAttribute("error", "Failed to load refill data");
-            return "user/refills";
-        }
-    }
-
-    /**
-     * Displays health metrics information.
-     *
      * @return The health metrics view template
      */
     @GetMapping("/health")
-    public String showHealthMetrics() {
-        logger.debug("Displaying health metrics view");
-        return "user/health";
+    public String showHealthMetrics(@AuthenticationPrincipal UserDetails userDetails, Model model) {
+        if (userDetails == null || userDetails.getUsername() == null) {
+            logger.error("Unauthenticated access attempt to health metrics");
+            return "redirect:/login";
+        }
+
+        String username = userDetails.getUsername();
+        logger.debug("Loading health metrics for user: {}", username);
+
+        try {
+            List<MedicationDTO> medications = medicationService.getUserMedications(username);
+
+            // Get stats for each medication and set them in the DTO
+            for (MedicationDTO med : medications) {
+                Map<String, Long> stats = medicationService.getMedicationIntakeStats(med.getId(), username);
+                med.setStats(stats);
+            }
+
+            model.addAttribute("medications", medications);
+            model.addAttribute("username", username);
+            model.addAttribute("currentDateTime", LocalDateTime.now());
+
+            logger.info("Health metrics loaded successfully for user: {}", username);
+            return "user/health";
+        } catch (Exception e) {
+            logger.error("Failed to load health metrics for user {}: {}", username, e.getMessage(), e);
+            model.addAttribute("error", "Failed to load health metrics");
+            return "user/health";
+        }
     }
 
     /**
@@ -616,5 +626,47 @@ public class UserController {
             model.addAttribute("error", "Failed to load schedule data. Please try again later.");
             return "user/schedule";
         }
+    }
+
+    /**
+     * Handles submission of medication intake log.
+     *
+     * @param medicationId The ID of the medication
+     * @param scheduledTime The scheduled intake time
+     * @param actualTime The actual intake time
+     * @param userDetails Authenticated user details
+     * @param redirectAttributes Attributes for redirect scenarios
+     * @return Redirect to health page
+     */
+    @PostMapping("/health/log-intake")
+    public String logMedicationIntake(
+            @RequestParam("medicationId") Long medicationId,
+            @RequestParam("scheduledTime") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime scheduledTime,
+            @RequestParam(value = "actualTime", required = false) String actualTime,
+            @AuthenticationPrincipal UserDetails userDetails,
+            RedirectAttributes redirectAttributes) {
+
+        logger.info("Logging intake for medication ID: {} for user: {}", medicationId, userDetails.getUsername());
+
+        try {
+            // No need to parse scheduledTime; it's already a LocalDateTime
+            LocalDateTime actualDateTime = (actualTime != null && !actualTime.isEmpty()) ?
+                    LocalDateTime.parse(actualTime) : null;
+
+            medicationService.logMedicationIntake(
+                    medicationId,
+                    scheduledTime, // Use directly
+                    actualDateTime,
+                    userDetails.getUsername()
+            );
+
+            redirectAttributes.addFlashAttribute("success", "Intake logged successfully");
+            logger.info("Intake logged successfully for medication ID: {}", medicationId);
+        } catch (Exception e) {
+            logger.error("Failed to log intake for medication ID: {}: {}", medicationId, e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("error", "Failed to log intake");
+        }
+
+        return "redirect:/user/health";
     }
 }

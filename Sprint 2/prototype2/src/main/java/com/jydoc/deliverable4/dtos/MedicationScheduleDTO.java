@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalTime;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Data
 @Builder
@@ -51,8 +52,7 @@ public class MedicationScheduleDTO {
             return "Everyday";
         }
         return daysOfWeek.stream()
-                .map(Enum::name)
-                .reduce((a, b) -> a + ", " + b)
-                .orElse("");
+                .map(Enum::toString)
+                .collect(Collectors.joining(", "));
     }
 }

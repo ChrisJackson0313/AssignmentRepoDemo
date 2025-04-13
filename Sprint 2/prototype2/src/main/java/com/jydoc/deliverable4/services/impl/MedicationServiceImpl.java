@@ -4,23 +4,21 @@ import com.jydoc.deliverable4.dtos.MedicationDTO;
 import com.jydoc.deliverable4.dtos.MedicationScheduleDTO;
 import com.jydoc.deliverable4.dtos.RefillReminderDTO;
 import com.jydoc.deliverable4.model.*;
+import com.jydoc.deliverable4.repositories.medicationrepositories.MedicationIntakeLogRepository;
 import com.jydoc.deliverable4.repositories.medicationrepositories.MedicationIntakeTimeRepository;
 import com.jydoc.deliverable4.repositories.medicationrepositories.MedicationRepository;
 import com.jydoc.deliverable4.repositories.userrepositories.UserRepository;
-import com.jydoc.deliverable4.security.Exceptions.MedicationCreationException;
-import com.jydoc.deliverable4.security.Exceptions.MedicationNotFoundException;
-import com.jydoc.deliverable4.security.Exceptions.MedicationScheduleException;
-import com.jydoc.deliverable4.security.Exceptions.UserNotFoundException;
+import com.jydoc.deliverable4.security.Exceptions.*;
 import com.jydoc.deliverable4.services.medicationservices.MedicationService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -38,6 +36,11 @@ public class MedicationServiceImpl implements MedicationService {
     private final MedicationRepository medicationRepository;
     private final UserRepository userRepository;
     private final MedicationIntakeTimeRepository intakeTimeRepository;
+    private final MedicationIntakeLogRepository intakeLogRepository;
+
+
+
+
 
     /**
      * Retrieves all medications for a specific user.
@@ -265,14 +268,35 @@ public class MedicationServiceImpl implements MedicationService {
         long startTime = System.currentTimeMillis();
 
         try {
-            validateMedicationExists(id);
-            deleteIntakeTimes(id);
-            medicationRepository.deleteById(id);
+            // First get the medication with all relationships
+            MedicationModel medication = medicationRepository.findById(id)
+                    .orElseThrow(() -> {
+                        logger.error("Medication not found with ID: {}", id);
+                        return new MedicationNotFoundException("Medication not found with ID: " + id);
+                    });
+
+            // Option 1: Delete all associated intake logs first
+            intakeLogRepository.deleteByMedicationId(id);
+
+            // Option 2: Alternatively, clear the collection if using orphanRemoval
+            // medication.getIntakeLogs().clear();
+
+            // Then delete the medication
+            medicationRepository.delete(medication);
 
             logOperationSuccess("deleted", id, "medication", startTime);
         } catch (Exception e) {
             logOperationError("deleting medication", id.toString(), e);
-            throw new RuntimeException("Failed to delete medication", e);
+
+            // More specific error handling
+            if (e instanceof DataIntegrityViolationException) {
+                throw new MedicationDeletionException(
+                        "Cannot delete medication - it has associated records. Delete the records first.", e);
+            } else if (e instanceof MedicationNotFoundException) {
+                throw e; // Re-throw specific exceptions
+            } else {
+                throw new MedicationDeletionException("Failed to delete medication", e);
+            }
         }
     }
 
@@ -749,5 +773,104 @@ public class MedicationServiceImpl implements MedicationService {
             }
         });
     }
+
+    /**
+     * Logs a medication intake.
+     *
+     * @param medicationId The ID of the medication
+     * @param scheduledTime The scheduled intake time
+     * @param actualTime The actual intake time
+     * @param username The username of the user
+     */
+    @Override
+    @Transactional
+    public void logMedicationIntake(Long medicationId, LocalDateTime scheduledTime,
+                                    LocalDateTime actualTime, String username) {
+
+        try {
+            // 1. Validate input times
+            if (scheduledTime == null) {
+                throw new RuntimeException();
+            }
+
+            // 2. Fetch medication
+            MedicationModel medication = medicationRepository.findByIdAndUserUsername(medicationId, username)
+                    .orElseThrow(() -> new MedicationNotFoundException("Medication not found for user"));
+
+            // 3. Determine status with proper timezone-aware comparison
+            MedicationIntakeLog.IntakeStatus status = determineIntakeStatus(scheduledTime, actualTime);
+
+            // 4. Create and save log
+            MedicationIntakeLog log = new MedicationIntakeLog();
+            log.setMedication(medication);
+            log.setScheduledTime(scheduledTime);
+            log.setActualIntakeTime(actualTime);
+            log.setStatus(status);
+            log.setLoggedAt(LocalDateTime.now());
+
+            intakeLogRepository.save(log);
+
+        } catch (MedicationNotFoundException e) {
+            logger.error("Medication not found: ID={}, User={}", medicationId, username, e);
+            throw e;
+        } catch (Exception e) {
+            logger.error("Failed to log intake for medication ID: {}", medicationId, e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    private MedicationIntakeLog.IntakeStatus determineIntakeStatus(LocalDateTime scheduledTime,
+                                                                   LocalDateTime actualTime) {
+        if (actualTime == null) {
+            return MedicationIntakeLog.IntakeStatus.MISSED;
+        }
+
+        // Convert to Instant for timezone-agnostic comparison
+        Instant scheduledInstant = scheduledTime.atZone(ZoneId.systemDefault()).toInstant();
+        Instant actualInstant = actualTime.atZone(ZoneId.systemDefault()).toInstant();
+
+        long minutesDifference = ChronoUnit.MINUTES.between(scheduledInstant, actualInstant);
+
+        if (minutesDifference >= -15 && minutesDifference <= 15) {  // ±15 minute window
+            return MedicationIntakeLog.IntakeStatus.ON_TIME;
+        } else if (minutesDifference > 15) {
+            return MedicationIntakeLog.IntakeStatus.LATE;
+        } else {
+            return MedicationIntakeLog.IntakeStatus.EARLY;
+        }
+    }
+
+
+
+    /**
+     * Retrieves intake statistics for a medication.
+     *
+     * @param medicationId The ID of the medication
+     * @param username The username of the user
+     * @return Map containing stats (onTime, late, missed counts)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Long> getMedicationIntakeStats(Long medicationId, String username) {
+        MedicationModel medication = medicationRepository.findByIdAndUserUsername(medicationId, username)
+                .orElseThrow(() -> new MedicationNotFoundException("Medication not found"));
+
+        List<MedicationIntakeLog> logs = intakeLogRepository.findByMedication(medication);
+
+        return logs.stream()
+                .collect(Collectors.groupingBy(
+                        log -> log.getStatus().name(),
+                        Collectors.counting()
+                ));
+    }
+
+
+
+
+
+
+
+
+
 
 }

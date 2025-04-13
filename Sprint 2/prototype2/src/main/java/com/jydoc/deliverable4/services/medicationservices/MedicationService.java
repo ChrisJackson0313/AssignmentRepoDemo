@@ -6,7 +6,9 @@ import com.jydoc.deliverable4.dtos.RefillReminderDTO;
 import com.jydoc.deliverable4.security.Exceptions.MedicationNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -102,4 +104,23 @@ public interface MedicationService {
      * @throws IllegalArgumentException if username is null or empty
      */
     List<RefillReminderDTO> getUpcomingRefills(String username);
+
+    /**
+     * Logs a medication intake.
+     *
+     * @param medicationId The ID of the medication
+     * @param scheduledTime The scheduled intake time
+     * @param actualTime The actual intake time
+     * @param username The username of the user
+     */
+    void logMedicationIntake(Long medicationId, LocalDateTime scheduledTime, LocalDateTime actualTime, String username);
+
+    /**
+     * Retrieves intake statistics for a medication.
+     *
+     * @param medicationId The ID of the medication
+     * @param username The username of the user
+     * @return Map containing stats (onTime, late, missed counts)
+     */
+    Map<String, Long> getMedicationIntakeStats(Long medicationId, String username);
 }
